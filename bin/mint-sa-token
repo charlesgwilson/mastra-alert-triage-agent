@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+# Mint a read-only Viewer service-account token in the demo Grafana and write it into .env
+# as GRAFANA_SERVICE_ACCOUNT_TOKEN, without printing the token. Re-run after every
+# `docker compose up`: the demo Grafana has no data volume, so its DB (and this token) is
+# fresh each time. Requires curl, jq, and node.
+set -euo pipefail
+GRAFANA_URL="${GRAFANA_URL:-http://localhost:13000}"
+ADMIN="${GRAFANA_ADMIN:-admin:admin}"
+cd "$(dirname "$0")/.."
+
+SA_ID=$(curl -sf -u "$ADMIN" -X POST "$GRAFANA_URL/api/serviceaccounts" \
+  -H 'Content-Type: application/json' \
+  -d '{"name":"alert-triage-reader","role":"Viewer"}' | jq -r '.id')
+[ -n "${SA_ID:-}" ] && [ "$SA_ID" != "null" ] || {
+  echo "could not create the service account (is Grafana up at $GRAFANA_URL?)" >&2
+  exit 1
+}
+
+TMP=$(mktemp)
+trap 'rm -f "$TMP"' EXIT
+curl -sf -u "$ADMIN" -X POST "$GRAFANA_URL/api/serviceaccounts/$SA_ID/tokens" \
+  -H 'Content-Type: application/json' -d '{"name":"alert-triage-token"}' | jq -r '.key' > "$TMP"
+
+# Write the token file-to-file so it never lands in the terminal or shell history.
+node -e '
+  const fs = require("fs")
+  const key = fs.readFileSync(process.argv[1], "utf8").trim()
+  let env = fs.existsSync(".env") ? fs.readFileSync(".env", "utf8") : ""
+  env = /^GRAFANA_SERVICE_ACCOUNT_TOKEN=/m.test(env)
+    ? env.replace(/^GRAFANA_SERVICE_ACCOUNT_TOKEN=.*$/m, "GRAFANA_SERVICE_ACCOUNT_TOKEN=" + key)
+    : env.replace(/\n?$/, "\n") + "GRAFANA_SERVICE_ACCOUNT_TOKEN=" + key + "\n"
+  fs.writeFileSync(".env", env)
+' "$TMP"
+
+echo "wrote GRAFANA_SERVICE_ACCOUNT_TOKEN to .env (Viewer service account, id $SA_ID)"

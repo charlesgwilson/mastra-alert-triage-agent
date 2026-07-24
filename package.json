@@ -1,0 +1,23 @@
+{
+  "name": "mastra-alert-triage-agent",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "mastra dev",
+    "build": "mastra build",
+    "start": "mastra build && node --env-file=.env .mastra/output/index.mjs",
+    "typecheck": "tsc --noEmit",
+    "test": "node --test test/hardening.test.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.1",
+    "mastra": "^1.18.2",
+    "typescript": "^6.0.3"
+  },
+  "dependencies": {
+    "@mastra/core": "^1.50.1",
+    "@mastra/mcp": "^1.14.0",
+    "zod": "^4.4.3"
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "name": "demo-webapp",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Instrumented demo webapp (OTel traces+logs, Prometheus metrics) with a planted bug + fault generator, for the alert-triage lab.",
+  "scripts": {
+    "start": "node -r ./otel.js server.js",
+    "load": "node loadgen.js"
+  },
+  "dependencies": {
+    "@opentelemetry/api": "^1.9.0",
+    "@opentelemetry/api-logs": "^0.205.0",
+    "@opentelemetry/auto-instrumentations-node": "^0.62.0",
+    "@opentelemetry/exporter-logs-otlp-http": "^0.205.0",
+    "@opentelemetry/exporter-trace-otlp-http": "^0.205.0",
+    "@opentelemetry/resources": "^2.0.0",
+    "@opentelemetry/sdk-logs": "^0.205.0",
+    "@opentelemetry/sdk-node": "^0.205.0",
+    "@opentelemetry/semantic-conventions": "^1.37.0",
+    "express": "^4.21.2",
+    "prom-client": "^15.1.3"
+  }
+}

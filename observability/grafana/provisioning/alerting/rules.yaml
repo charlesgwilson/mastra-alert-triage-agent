@@ -1,0 +1,56 @@
+apiVersion: 1
+
+groups:
+  - orgId: 1
+    name: demo-webapp-alerts
+    folder: Alerts
+    interval: 30s
+    rules:
+      - uid: webapp-error-ratio
+        title: WebappErrorRatioHigh
+        condition: C
+        for: 30s
+        noDataState: OK
+        execErrState: Error
+        labels:
+          severity: warning
+          service: demo-webapp
+        annotations:
+          summary: demo-webapp 5xx error ratio is high
+          description: >-
+            The /checkout error ratio exceeded 10% over the last minute.
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              refId: A
+              editorMode: code
+              instant: true
+              range: false
+              intervalMs: 1000
+              maxDataPoints: 43200
+              expr: sum(rate(http_requests_total{status="5xx"}[1m])) / clamp_min(sum(rate(http_requests_total[1m])), 0.001)
+          - refId: C
+            relativeTimeRange:
+              from: 0
+              to: 0
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: A
+              conditions:
+                - type: query
+                  evaluator:
+                    type: gt
+                    params: [0.1, 0]
+                  operator:
+                    type: and
+                  query:
+                    params: [C]
+                  reducer:
+                    type: last
+                    params: []

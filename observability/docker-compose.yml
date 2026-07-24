@@ -1,0 +1,82 @@
+name: atg-demo
+
+# Self-contained observability stack for the alert-triage lab.
+# OFFSET PORTS — a local Grafana/Prometheus/etc. stack may already hold the default ports
+# (3000/9090/3100/3200/4317-4318), so everything here is +10000-ish.
+#   Grafana 13000 · Prometheus 19090 · Loki 13100 · Tempo 13200 · Alloy OTLP 14317/14318
+# The demo webapp + the Mastra agent run on the HOST; containers reach them via
+# host.docker.internal (extra_hosts). Grafana's webhook contact point -> the Mastra
+# server on the host at http://host.docker.internal:14111/webhooks/grafana.
+
+services:
+  prometheus:
+    image: prom/prometheus:v3.13.0
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --enable-feature=exemplar-storage
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - 127.0.0.1:19090:9090
+    extra_hosts:
+      - host.docker.internal:host-gateway
+    restart: unless-stopped
+
+  tempo:
+    image: grafana/tempo:3.0.2
+    command: [-config.file=/etc/tempo/tempo.yaml]
+    volumes:
+      - ./tempo/tempo.yaml:/etc/tempo/tempo.yaml:ro
+      - tempo-data:/var/tempo
+    ports:
+      - 127.0.0.1:13200:3200
+    restart: unless-stopped
+
+  loki:
+    image: grafana/loki:3.7.3
+    command: [-config.file=/etc/loki/loki-config.yaml]
+    volumes:
+      - ./loki/loki-config.yaml:/etc/loki/loki-config.yaml:ro
+      - loki-data:/loki
+    ports:
+      - 127.0.0.1:13100:3100
+    restart: unless-stopped
+
+  alloy:
+    image: grafana/alloy:v1.17.1
+    command:
+      - run
+      - --server.http.listen-addr=0.0.0.0:12345
+      - /etc/alloy/config.alloy
+    volumes:
+      - ./alloy/config.alloy:/etc/alloy/config.alloy:ro
+    ports:
+      - 127.0.0.1:14317:4317
+      - 127.0.0.1:14318:4318
+    depends_on: [tempo, loki]
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:13.1.0
+    environment:
+      # Local-only throwaway credentials for the demo stack — never reused anywhere real.
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_AUTH_ANONYMOUS_ENABLED=false
+      - GF_FEATURE_TOGGLES_ENABLE=traceToMetrics
+      # Interpolated into the provisioned webhook contact point ($GRAFANA_WEBHOOK_SECRET)
+      # at load; value comes from the repo-root .env (compose is run from there with
+      # `docker compose --env-file .env -f observability/docker-compose.yml`, per the README).
+      - GRAFANA_WEBHOOK_SECRET=${GRAFANA_WEBHOOK_SECRET}
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+    ports:
+      - 127.0.0.1:13000:3000
+    extra_hosts:
+      - host.docker.internal:host-gateway
+    depends_on: [prometheus, tempo, loki]
+    restart: unless-stopped
+
+volumes:
+  tempo-data:
+  loki-data:
